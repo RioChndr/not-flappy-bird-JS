@@ -10,7 +10,8 @@ let keyDownPressed = false;
 
 let config = {
     frameRefreshObstacle: 700,
-    marginObstacle: 300
+    marginObstacle: 300,
+    offsetRadiusBird: 10,
 }
 
 function start() {
@@ -45,31 +46,32 @@ function getKeyPressed() {
 start();
 
 function Bird(assetImg) {
-    this.px = 50;
-    this.py = 50;
-    this.w = 100;
-    this.h = 100;
-    this.angle = 0;
-    this.rotateSpeed = 0;
-    this.gravity = 1;
-    this.gravitySpeedy = 0;
-    this.speedUp = 0;
-    this.speedUpIncrement = 3;
-    this.speedUp = 0;
-    this.color = 'red';
-    this.isGoUp = false;
-    this.birdImg = new Image();
-    this.birdImg.src = assetImg;
-
-
-
+    this.init = function(){
+        this.px = 100;
+        this.py = 100;
+        this.w = 100;
+        this.h = 100;
+        this.cx = 0;
+        this.cy = 0;
+        this.radius = (this.w / 2) - config.offsetRadiusBird;
+        this.angle = 0;
+        this.rotateSpeed = 0;
+        this.gravity = 1;
+        this.gravitySpeedy = 0;
+        this.speedUp = 0;
+        this.speedUpIncrement = 3;
+        this.speedUp = 0;
+        this.color = 'red';
+        this.isGoUp = false;
+        this.birdImg = new Image();
+        this.birdImg.src = assetImg;
+    }
+    this.init();
+    
     this.show = function () {
-        this.cx = this.px + this.w / 2;
-        this.cy = this.py + this.h / 2;
+
         ctx.save();
         ctx.translate(this.cx, this.cy);
-
-
         ctx.rotate(this.angle);
         ctx.translate(-this.cx, -this.cy);
         ctx.fillStyle = this.color;
@@ -78,7 +80,6 @@ function Bird(assetImg) {
             this.w,
             this.h);
         ctx.restore();
-
     };
     this.move = function () {
         if (this.isGoUp) {
@@ -86,6 +87,8 @@ function Bird(assetImg) {
         } else {
             this.fly();
         }
+        this.cx = this.px + (this.w / 2);
+        this.cy = this.py + (this.h / 2);
     }
     this.fly = function () {
         this.speedUp = 0;
@@ -106,7 +109,9 @@ function Bird(assetImg) {
         this.gravitySpeedy = 0;
         this.speedUp += this.speedUpIncrement;
         this.py -= this.speedUp;
-
+    }
+    this.reset = function () {
+        this.init();
     }
 }
 
@@ -119,6 +124,8 @@ function Obstacle(assetImg) {
     this.w = this.img.width * this.scale;
     this.h = this.img.height * this.scale;
     this.show = function () {
+        // ctx.fillStyle = 'black';
+        // ctx.fillRect(this.px, this.py, this.w, this.h);
         ctx.drawImage(this.img, this.px, this.py, this.w, this.h);
     }
 }
@@ -135,8 +142,6 @@ function getDotCoordinate(objek) {
         h: objek.h
     }
 }
-
-let flappy = new Bird('assets/bird.png');
 
 function ObstacleController() {
     this.Obstacles = [];
@@ -168,14 +173,14 @@ function ObstacleController() {
             }
             if (this.Obstacles[i].top.px < bird.px + bird.w + 100) {
                 console.log(i);
-                let isInsideTop = this.isInside(bird, this.Obstacles[i].top);
-                let isInsideBot = this.isInside(bird, this.Obstacles[i].bottom);
+                let isInsideTop = this.isCollideCircleBox(bird, this.Obstacles[i].top);
+                let isInsideBot = this.isCollideCircleBox(bird, this.Obstacles[i].bottom);
                 if (isInsideTop || isInsideBot) {
                     this.isCollideToBird = true;
                 }
             }
-            this.Obstacles[i].top.show();
-            this.Obstacles[i].bottom.show();
+            // this.Obstacles[i].top.show();
+            // this.Obstacles[i].bottom.show();
 
         }
         // console.log("jumlah obstacle = " + this.Obstacles.length);
@@ -194,7 +199,7 @@ function ObstacleController() {
     this.isCollide = function () {
         return this.isCollideToBird
     }
-    this.isInside = function (obj1, obj2) {
+    this.isCollideBox = function (obj1, obj2) {
         function isInsideBox(dot, box) {
             return dot[0] > box.px && dot[0] < box.px + box.w &&
                 dot[1] > box.py && dot[1] < box.py + box.h;
@@ -212,39 +217,132 @@ function ObstacleController() {
         };
         return false;
     }
-}
 
+    this.isCollideCircleBox = function (circle, box) {
+        let testX = circle.cx;
+        let testY = circle.cy;
+
+        if (circle.cx < box.px) testX = box.px;
+        else if (circle.cx > box.px + box.w) testX = box.px + box.w;
+        if (circle.cy < box.py) testY = box.py;
+        else if (circle.cy > box.py + box.h) testY = box.py + box.h;
+
+        // get Distance from closest edges;
+        let distX = circle.cx - testX;
+        let distY = circle.cy - testY;
+        let distance = Math.sqrt(Math.pow(distX, 2) + Math.pow(distY, 2));
+        if (distance <= circle.radius) {
+            return true;
+        }
+        return false;
+    }
+
+    this.reset = function () {
+        this.Obstacles = [];
+        this.bird = null;
+        this.isCollideToBird = false;
+    }
+}
+let flappy = new Bird('assets/bird.png');;
 let obstacleController = new ObstacleController()
 let last;
 let frames = 0;
+
+function Game() {
+    this.score = 0;
+    this.isRunning = false;
+    this.isLose = false;
+
+    this.newGame = function () {
+        this.score = 0;
+        this.isRunning = false;
+    }
+
+    this.start = function () {
+        this.score = 0;
+        this.isRunning = true;
+        this.isLose = false;
+    }
+
+    this.showUI = function () {
+        if (!this.isRunning && !this.isLose) {
+            this.showStartInfo();
+        } else if (this.isRunning && !this.isLose) {
+            this.showScore();
+        } else if (this.isLose === true && !this.isRunning) {
+            this.showLoseInfo();
+            this.showStartInfo();
+        }
+    }
+    this.showStartInfo = function () {
+        ctx.font = "50px Arial";
+        ctx.fillStyle = 'green';
+        ctx.textAlign = 'center';
+        ctx.fillText("Tekan ENTER untuk Mulai !! 😊😊", canvas.width / 2, canvas.height / 2);
+    }
+    this.showScore = function () {
+
+        ctx.font = "50px Arial";
+        ctx.fillStyle = 'green';
+        ctx.textAlign = 'center';
+        ctx.fillText(this.score, canvas.width / 2, canvas.height / 4);
+    }
+    this.showLoseInfo = function () {
+        ctx.font = "50px Arial";
+        ctx.fillStyle = 'red';
+        ctx.textAlign = 'center';
+        ctx.fillText("Yah.. Anda Kalah 😭. Score anda adalah : " + this.score, canvas.width / 2, canvas.height / 2 - 100);
+
+    }
+    this.playerLose = function () {
+        this.isRunning = false;
+        this.isLose = true;
+    }
+}
+
+let game = new Game();
+
 function loop(timestamp) {
     frames++;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (!last || timestamp - last > config.frameRefreshObstacle) {
+    if ((!last || timestamp - last > config.frameRefreshObstacle) && game.isRunning == true) {
         // console.log("pop");
         obstacleController.createObs();
         last = timestamp;
+        game.score++;
     }
 
-    if ((keyDownPressed == 38 || keyDownPressed == 87) && flappy.isGoUp == false) {
-        flappy.isGoUp = true;
-        keyDownPressed = false;
+    if (game.isRunning === true) {
+        if (keyDownPressed == 38 || keyDownPressed == 87) {
+            flappy.isGoUp = true;
+            keyDownPressed = false;
+        }
+        if (keyUpPressed == 38 || keyUpPressed == 87) {
+            flappy.isGoUp = false;
+            keyUpPressed = false;
+        }
+        flappy.move();
+
+        obstacleController.setBird(flappy);
+        obstacleController.moveObstacles();
+        // obstacleController.showObstacles();
+        if (obstacleController.isCollide() || flappy.cy > canvas.height) {
+            console.log('you lose');
+            game.playerLose();
+        }
+    } else {
+        if (keyUpPressed == 13) {
+            game.start();
+            obstacleController.reset();
+            flappy.reset();
+            keyUpPressed = null;
+        }
     }
-    if (keyUpPressed == 38 || keyUpPressed == 87) {
-        flappy.isGoUp = false;
-        keyUpPressed = false;
-    }
-    flappy.move();
     flappy.show();
-    obstacleController.setBird(flappy);
-    obstacleController.moveObstacles();
-    // obstacleController.showObstacles();
-    if (obstacleController.isCollide()) {
-        alert("you FUCKING LOSE");
-        // console.log("kalah")
-    };
+    obstacleController.showObstacles();
+    game.showUI();
 
     window.requestAnimationFrame(loop);
 }
