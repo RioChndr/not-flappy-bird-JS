@@ -1,6 +1,6 @@
 # NOT a Flappy Bird Game..
 
-![image-20200816205949529](img\ss)
+![image-20200816205949529](img/ss.png)
 
 
 
